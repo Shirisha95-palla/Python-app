@@ -1,35 +1,55 @@
 pipeline {
-    agent any 
-    environment {
-    DOCKERHUB_CREDENTIALS = credentials('docker-cred')
-    }
-    stages { 
+    agent any
 
-        stage('Build docker image') {
-            steps {  
-                sh ' docker build -t shirisha2018/python-app:$BUILD_NUMBER .'
+    environment {
+        DOCKERHUB_CREDENTIALS = credentials('docker-cred') // Jenkins credentials ID for DockerHub
+    }
+
+    stages {
+        stage('Clone Repository') {
+            steps {
+                git 'https://github.com/Shirisha95-palla/Python-app.git'
             }
         }
-        stage('login to dockerhub') {
-            steps{
-                sh 'echo $DOCKERHUB_CREDENTIALS_PSW | docker login -u $DOCKERHUB_CREDENTIALS_USR --password-stdin'
+
+        stage('Build Docker Image') {
+            steps {
+                sh 'docker build -t shirisha2018/python-app:${BUILD_NUMBER} .'
             }
         }
-        stage('push image') {
-            steps{
-                sh ' docker push vatsraj/pythonapp:$BUILD_NUMBER'
+
+        stage('Login to DockerHub') {
+            steps {
+                sh '''
+                    echo "$DOCKERHUB_CREDENTIALS_PSW" | docker login -u "$DOCKERHUB_CREDENTIALS_USR" --password-stdin
+                '''
             }
         }
-}
-post {
+
+        stage('Push Docker Image') {
+            steps {
+                sh 'docker push shirisha2018/python-app:${BUILD_NUMBER}'
+            }
+        }
+    }
+
+    post {
         always {
             sh 'docker logout'
         }
-success {
-                slackSend message: "Build deployed successfully - ${env.JOB_NAME} ${env.BUILD_NUMBER} (<${env.BUILD_URL}|Open>)"
-            }
-    failure {
-        slackSend message: "Build failed  - ${env.JOB_NAME} ${env.BUILD_NUMBER} (<${env.BUILD_URL}|Open>)"
-    }
+        success {
+            slackSend (
+                channel: '#all-shirisha',
+                color: 'good',
+                message: "✅ Docker image pushed successfully: *${env.JOB_NAME}* #${env.BUILD_NUMBER} (<${env.BUILD_URL}|Open>)"
+            )
+        }
+        failure {
+            slackSend (
+                channel: '#all-shirisha',
+                color: 'danger',
+                message: "❌ Docker image build/push failed: *${env.JOB_NAME}* #${env.BUILD_NUMBER} (<${env.BUILD_URL}|Open>)"
+            )
+        }
     }
 }
